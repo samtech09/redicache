@@ -44,6 +44,11 @@ func (s *RedisSession) getClient() (*redis.Client, error) {
 	return s.client, err
 }
 
+//Raw allow to execute all commands on redis without any pre-check, use with responsibility
+func (s *RedisSession) Raw() *redis.Client {
+	return s.client
+}
+
 //SetStr sets raw string with given key and expiration
 func (s *RedisSession) SetStr(value, key string, expiration time.Duration) error {
 	c, err := s.getClient()

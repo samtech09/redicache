@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-//InitSession initialize session with redis server with given config
+// InitSession initialize session with redis server with given config
 func InitSession(config RedisConfig) *RedisSession {
 	s := RedisSession{}
 	s.debug = config.Debug
@@ -25,7 +25,7 @@ func InitSession(config RedisConfig) *RedisSession {
 	return &s
 }
 
-//getClient isused to get Redis client
+// getClient isused to get Redis client
 func (s *RedisSession) getClient() (*redis.Client, error) {
 	if s.client != nil {
 		return s.client, nil
@@ -46,12 +46,110 @@ func (s *RedisSession) getClient() (*redis.Client, error) {
 	return s.client, err
 }
 
-//Raw allow to execute all commands on redis without any pre-check, use with responsibility
+// Raw allow to execute all commands on redis without any pre-check, use with responsibility
 func (s *RedisSession) Raw() *redis.Client {
 	return s.client
 }
 
-//SetStr sets raw string with given key and expiration
+// CounterSet sets int with given key and expiration
+func (s *RedisSession) CounterSet(value int, key string, expiration time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
+	defer cancel()
+
+	c, err := s.getClient()
+	if err != nil {
+		return err
+	}
+	key = s.config.KeyPrefix + key
+	err = c.Set(ctx, key, value, expiration).Err()
+	if err != nil {
+		s.logMsg("cache.CounterSet", "Error setting %s to cache: %v", key, err)
+	}
+	return err
+}
+
+// Counter sets raw int with given key and expiration
+func (s *RedisSession) CounterGet(value int, key string) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
+	defer cancel()
+
+	c, err := s.getClient()
+	if err != nil {
+		return 0, err
+	}
+	key = s.config.KeyPrefix + key
+	str, err := c.Get(ctx, key).Result()
+	if err != nil {
+		s.logMsg("cache.CounterGet", "Error setting %s to cache: %v", key, err)
+	}
+	return strconv.ParseInt(str, 10, 64)
+}
+
+func (s *RedisSession) CounterINCR(key string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
+	defer cancel()
+
+	c, err := s.getClient()
+	if err != nil {
+		return err
+	}
+	key = s.config.KeyPrefix + key
+	err = c.Incr(ctx, key).Err()
+	if err != nil {
+		s.logMsg("cache.SetInt", "Error setting %s to cache: %v", key, err)
+	}
+	return err
+}
+
+func (s *RedisSession) CounterINCRBy(incrby int, key string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
+	defer cancel()
+
+	c, err := s.getClient()
+	if err != nil {
+		return err
+	}
+	key = s.config.KeyPrefix + key
+	err = c.IncrBy(ctx, key, int64(incrby)).Err()
+	if err != nil {
+		s.logMsg("cache.SetInt", "Error setting %s to cache: %v", key, err)
+	}
+	return err
+}
+
+func (s *RedisSession) CounterDECR(key string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
+	defer cancel()
+
+	c, err := s.getClient()
+	if err != nil {
+		return err
+	}
+	key = s.config.KeyPrefix + key
+	err = c.Incr(ctx, key).Err()
+	if err != nil {
+		s.logMsg("cache.SetInt", "Error setting %s to cache: %v", key, err)
+	}
+	return err
+}
+
+func (s *RedisSession) CounterDECRBy(decrby int, key string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
+	defer cancel()
+
+	c, err := s.getClient()
+	if err != nil {
+		return err
+	}
+	key = s.config.KeyPrefix + key
+	err = c.DecrBy(ctx, key, int64(decrby)).Err()
+	if err != nil {
+		s.logMsg("cache.SetInt", "Error setting %s to cache: %v", key, err)
+	}
+	return err
+}
+
+// SetStr sets raw string with given key and expiration
 func (s *RedisSession) SetStr(value, key string, expiration time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
 	defer cancel()
@@ -60,6 +158,7 @@ func (s *RedisSession) SetStr(value, key string, expiration time.Duration) error
 	if err != nil {
 		return err
 	}
+	key = s.config.KeyPrefix + key
 	err = c.Set(ctx, key, value, expiration).Err()
 	if err != nil {
 		s.logMsg("cache.SetStr", "Error setting %s to cache: %v", key, err)
@@ -67,12 +166,12 @@ func (s *RedisSession) SetStr(value, key string, expiration time.Duration) error
 	return err
 }
 
-//Set either add new record or update existing with default expiration set in CacheCandidate
+// Set either add new record or update existing with default expiration set in CacheCandidate
 func (s *RedisSession) Set(value CacheCandidate, parentid1, parentid2 string) error {
 	return s.SetWithExp(value, value.GetExpiration(), parentid1, parentid2)
 }
 
-//SetWithExp set struct to cache with custom expiration
+// SetWithExp set struct to cache with custom expiration
 func (s *RedisSession) SetWithExp(value CacheCandidate, expiration time.Duration, parentid1, parentid2 string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
 	defer cancel()
@@ -98,10 +197,11 @@ func (s *RedisSession) SetWithExp(value CacheCandidate, expiration time.Duration
 	if err != nil {
 		s.logMsg("cache.SetExp", "Error setting %s to cache: %v", _key, err)
 	}
+	//fmt.Printf("Set with key: %s\n", _key)
 	return err
 }
 
-//SetSlice set []struct to cache with default expiration set in CacheCandidate
+// SetSlice set []struct to cache with default expiration set in CacheCandidate
 func (s *RedisSession) SetSlice(value interface{}, parentid1, parentid2 string, basetype CacheCandidate) error {
 	if value == nil {
 		return fmt.Errorf("nil value")
@@ -117,7 +217,7 @@ func (s *RedisSession) SetSlice(value interface{}, parentid1, parentid2 string, 
 	return s.setSliceWithExpiration(value, basetype.GetExpiration(), parentid1, parentid2, key)
 }
 
-//SetSliceWithExp set []struct to cache with given expiration
+// SetSliceWithExp set []struct to cache with given expiration
 func (s *RedisSession) SetSliceWithExp(value interface{}, parentid1, parentid2 string, expiration time.Duration, basetype CacheCandidate) error {
 	// cdall := value.([]CacheCandidate)
 	// cd := cdall[0]
@@ -130,7 +230,7 @@ func (s *RedisSession) SetSliceWithExp(value interface{}, parentid1, parentid2 s
 	return s.setSliceWithExpiration(value, expiration, parentid1, parentid2, key)
 }
 
-//setSliceWithExpiration set []struct to cache with custom expiration
+// setSliceWithExpiration set []struct to cache with custom expiration
 func (s *RedisSession) setSliceWithExpiration(value interface{}, expiration time.Duration, parentid1, parentid2, key string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
 	defer cancel()
@@ -150,7 +250,7 @@ func (s *RedisSession) setSliceWithExpiration(value interface{}, expiration time
 	return err
 }
 
-//Get return value of given key from cache
+// Get return value of given key from cache
 func (s *RedisSession) Get(key string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*5))
 	defer cancel()
@@ -167,7 +267,7 @@ func (s *RedisSession) Get(key string) (string, error) {
 	return str, err
 }
 
-//GetScanByKey retrive value from cache then deserialize to given dest type
+// GetScanByKey retrive value from cache then deserialize to given dest type
 func (s *RedisSession) GetScanByKey(key string, dest interface{}) error {
 	value, err := s.Get(key)
 	if err != nil {
@@ -182,14 +282,14 @@ func (s *RedisSession) GetScanByKey(key string, dest interface{}) error {
 	return nil
 }
 
-//GetScan retrive value from cache then deserialize to given dest type
+// GetScan retrive value from cache then deserialize to given dest type
 func (s *RedisSession) GetScan(parentid1, parentid2 string, dest interface{}, basetype CacheCandidate) error {
 	_key := basetype.GetKey(parentid1, parentid2)
-	fmt.Println(_key)
+	//fmt.Println(_key)
 	return s.GetScanByKey(_key, dest)
 }
 
-//GetKeys find and return keys beginning with given pattern
+// GetKeys find and return keys beginning with given pattern
 func (s *RedisSession) GetKeys(pattern string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
 	defer cancel()
@@ -207,7 +307,7 @@ func (s *RedisSession) GetKeys(pattern string) ([]string, error) {
 	return keys, nil
 }
 
-//DelKey delete single given key
+// DelKey delete single given key
 func (s *RedisSession) DelKey(key string) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*5))
 	defer cancel()
@@ -223,7 +323,7 @@ func (s *RedisSession) DelKey(key string) (int64, error) {
 	return cnt, nil
 }
 
-//DelKeys - delete multiple keys as geven []string
+// DelKeys - delete multiple keys as geven []string
 func (s *RedisSession) DelKeys(keys ...string) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
 	defer cancel()
@@ -239,7 +339,7 @@ func (s *RedisSession) DelKeys(keys ...string) (int64, error) {
 	return cnt, nil
 }
 
-//DelByPattern - first fils keys begins with given pattern then delete them
+// DelByPattern - first fils keys begins with given pattern then delete them
 func (s *RedisSession) DelByPattern(pattern string) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*15))
 	defer cancel()

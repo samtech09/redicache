@@ -27,10 +27,11 @@ func (x testCache) GetExpiration() time.Duration {
 func TestInit(t *testing.T) {
 	config := RedisConfig{}
 	config.DB = 4
-	config.Host = "192.168.60.206"
+	config.Host = "127.0.0.1"
 	config.KeyPrefix = "test:"
 	config.Port = 6379
 	config.Pwd = ""
+	config.Debug = true
 
 	ses = InitSession(config)
 	ses.RegisterCandidate(testCache{}, "test item for cache")
@@ -48,6 +49,7 @@ func TestEncodeDecode(t *testing.T) {
 	var tst2 testCache
 	err = ses.GetScan("p1", "p2", &tst2, tst)
 	if err != nil {
+		fmt.Printf("Err: %s\n", err.Error())
 		t.Error(err)
 	}
 	fmt.Println("GetScan: ")

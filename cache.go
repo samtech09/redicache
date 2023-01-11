@@ -51,7 +51,7 @@ func (s *RedisSession) Raw() *redis.Client {
 	return s.client
 }
 
-// CounterSet sets int with given key and expiration
+// CounterSet initialize int counter with given key, value and expiration
 func (s *RedisSession) CounterSet(value int, key string, expiration time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
 	defer cancel()
@@ -68,8 +68,8 @@ func (s *RedisSession) CounterSet(value int, key string, expiration time.Duratio
 	return err
 }
 
-// Counter sets raw int with given key and expiration
-func (s *RedisSession) CounterGet(value int, key string) (int64, error) {
+// CounterGet gives data of counter for given key
+func (s *RedisSession) CounterGet(key string) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
 	defer cancel()
 
@@ -85,6 +85,7 @@ func (s *RedisSession) CounterGet(value int, key string) (int64, error) {
 	return strconv.ParseInt(str, 10, 64)
 }
 
+// CounterINCR increment counter by 1
 func (s *RedisSession) CounterINCR(key string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
 	defer cancel()
@@ -101,6 +102,7 @@ func (s *RedisSession) CounterINCR(key string) error {
 	return err
 }
 
+// CounterINCRBy increment counter by given value
 func (s *RedisSession) CounterINCRBy(incrby int, key string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
 	defer cancel()
@@ -117,6 +119,7 @@ func (s *RedisSession) CounterINCRBy(incrby int, key string) error {
 	return err
 }
 
+// CounterDECR decrement counter by 1
 func (s *RedisSession) CounterDECR(key string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
 	defer cancel()
@@ -133,6 +136,7 @@ func (s *RedisSession) CounterDECR(key string) error {
 	return err
 }
 
+// CounterDECRBy decrement counter by given value
 func (s *RedisSession) CounterDECRBy(decrby int, key string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
 	defer cancel()
@@ -145,6 +149,23 @@ func (s *RedisSession) CounterDECRBy(decrby int, key string) error {
 	err = c.DecrBy(ctx, key, int64(decrby)).Err()
 	if err != nil {
 		s.logMsg("cache.SetInt", "Error setting %s to cache: %v", key, err)
+	}
+	return err
+}
+
+// Exp sets expiration for given key
+func (s *RedisSession) Exp(key string, expiration time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*10))
+	defer cancel()
+
+	c, err := s.getClient()
+	if err != nil {
+		return err
+	}
+	key = s.config.KeyPrefix + key
+	err = c.Expire(ctx, key, expiration).Err()
+	if err != nil {
+		s.logMsg("cache.SetStr", "Error setting %s to cache: %v", key, err)
 	}
 	return err
 }
